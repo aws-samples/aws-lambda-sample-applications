@@ -1,0 +1,16 @@
+{
+    "name": "lambda-s3",
+    "description": "Lambda-S3 starter project",
+    "version": "0.0.1",
+    "private": true,
+    "dependencies": {
+        "aws-sdk": "^2.437.0"
+    },
+    "devDependencies": {
+        "aws-sdk-mock": "^4.5.0",
+        "jest": "^24.7.1"
+    },
+    "scripts": {
+        "test": "jest"
+    }
+}
