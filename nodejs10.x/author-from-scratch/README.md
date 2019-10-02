@@ -11,15 +11,15 @@ This project includes the following files and folders:
 
 Your Lambda application includes two AWS CloudFormation stacks. The first stack creates the pipeline that builds and deploys your application.
 
-For a full list of possible operations [Go to the documentation](https://docs.aws.amazon.com/lambda/latest/dg/deploying-lambda-apps.html)
+For a full list of possible operations, see the [AWS Lambda Applications documentation](https://docs.aws.amazon.com/lambda/latest/dg/deploying-lambda-apps.html).
 
 ## Try the application out
 
-1. Go to the Lambda Console
-2. Select `Applications` and select the one you created
-3. Select `helloFromLambdaFunction` in the `Resources` table
-4. Create a test event with the default settings. (Select `Select a test event` -> select `configure test events` -> type in `Event name` -> select `Create`)
-5. Select `Test` and you can see the result
+1. Go to the Lambda console.
+2. Select **Applications** and select the one you created.
+3. Select **helloFromLambdaFunction** in the **Resources** table.
+4. Create a test event with the default settings. (Select **Select a test event** -> select **Configure test events** -> type in **Event name** -> select **Create**)
+5. Select **Test** and you can see the result.
 
 ## Add a resource to your application
 
