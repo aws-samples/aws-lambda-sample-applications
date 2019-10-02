@@ -1,0 +1,799 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: A Node.js web service deployed to AWS Lambda.
+Parameters:
+  AppId:
+    AllowedPattern: ^([a-zA-Z0-9-])+$
+    ConstraintDescription: Application IDs must be between 2 and 20 characters, begin with a letter, and only contain lowercase letters, numbers, and hyphens (-).
+    Description: Application ID.
+    MaxLength: 20
+    MinLength: 2
+    Type: String
+  AppResourceArns:
+    Description: Resource ARNs in Serverless App
+    Type: CommaDelimitedList
+    Default: ""
+  RepositoryName:
+    Description: Code repository name.
+    MaxLength: 100
+    MinLength: 1
+    Type: String
+  GitHubRepositoryAccessToken:
+    Description: GitHub Repository access token
+    Type: String
+    NoEcho: true
+    Default: ""
+  GitHubRepositoryOwner:
+    Description: GitHub Repository owner
+    Type: String
+    Default: ""
+  GitHubWebHookSecretToken:
+    Description: GitHub Webhook secret token
+    Type: String
+    NoEcho: true
+    Default: ""
+  SourceCodeBucketKey:
+    Description: Source Code repository S3 bucket key
+    Type: String
+  SourceCodeBucketName:
+    Description: Source Code repository S3 bucket name
+    Type: String
+  UseCodeCommit:
+    Description: Create code repository with CodeCommit
+    Type: String
+Conditions:
+  CreateRepoWithCodeCommit: !Equals
+  - !Ref 'UseCodeCommit'
+  - true
+  CreateRepoWithGitHub: !Equals
+  - !Ref 'UseCodeCommit'
+  - false
+
+Resources:
+  CloudFormationRole:
+    Description: Service role in IAM for AWS CloudFormation
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - cloudformation.amazonaws.com
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - s3:GetObject
+            - s3:GetObjectVersion
+            Effect: Allow
+            Resource:
+            - !Sub 'arn:${AWS::Partition}:s3:::${S3Bucket}'
+            - !Sub 'arn:${AWS::Partition}:s3:::${S3Bucket}/*'
+          - Action:
+            - lambda:CreateAlias
+            - lambda:CreateFunction
+            - lambda:DeleteAlias
+            - lambda:DeleteFunction
+            - lambda:DeleteFunctionConcurrency
+            - lambda:DeleteLayerVersion
+            - lambda:GetEventSourceMapping
+            - lambda:GetFunction
+            - lambda:GetFunctionConfiguration
+            - lambda:GetLayerVersion
+            - lambda:ListTags
+            - lambda:ListVersionsByFunction
+            - lambda:PublishLayerVersion
+            - lambda:PublishVersion
+            - lambda:PutFunctionConcurrency
+            - lambda:TagResource
+            - lambda:UntagResource
+            - lambda:UpdateAlias
+            - lambda:UpdateFunctionCode
+            - lambda:UpdateFunctionConfiguration
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - lambda:AddPermission
+            - lambda:RemovePermission
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppId}-*'
+          - Action:
+            - lambda:CreateEventSourceMapping
+            - lambda:DeleteEventSourceMapping
+            - lambda:UpdateEventSourceMapping
+            Effect: Allow
+            Resource: '*'
+            Condition:
+              ArnEquals:
+                lambda:FunctionArn: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppId}-*'
+          - Action:
+            - lambda:AddLayerVersionPermission
+            - lambda:RemoveLayerVersionPermission
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:layer:${AppId}-*'
+          - Action:
+            - apigateway:DELETE
+            - apigateway:GET
+            - apigateway:PATCH
+            - apigateway:POST
+            - apigateway:PUT
+            - apigateway:UpdateRestApiPolicy
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - dynamodb:CreateTable
+            - dynamodb:DeleteTable
+            - dynamodb:DescribeContinuousBackups
+            - dynamodb:DescribeStream
+            - dynamodb:DescribeTable
+            - dynamodb:DescribeTimeToLive
+            - dynamodb:ListTagsOfResource
+            - dynamodb:TagResource
+            - dynamodb:UntagResource
+            - dynamodb:UpdateContinuousBackups
+            - dynamodb:UpdateTable
+            - dynamodb:UpdateTimeToLive
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - events:DeleteRule
+            - events:DescribeRule
+            - events:ListTagsForResource
+            - events:PutRule
+            - events:PutTargets
+            - events:PutPermission
+            - events:RemoveTargets
+            - events:RemovePermission
+            - events:TagResource
+            - events:UntagResource
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - kinesis:AddTagsToStream
+            - kinesis:CreateStream
+            - kinesis:DecreaseStreamRetentionPeriod
+            - kinesis:DeleteStream
+            - kinesis:DescribeStream
+            - kinesis:IncreaseStreamRetentionPeriod
+            - kinesis:RemoveTagsFromStream
+            - kinesis:StartStreamEncryption
+            - kinesis:StopStreamEncryption
+            - kinesis:UpdateShardCount
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - s3:CreateBucket
+            - s3:DeleteBucket
+            - s3:DeleteBucketWebsite
+            - s3:PutAccelerateConfiguration
+            - s3:PutAnalyticsConfiguration
+            - s3:PutBucketAcl
+            - s3:PutBucketCORS
+            - s3:PutBucketLogging
+            - s3:PutBucketNotification
+            - s3:PutBucketPublicAccessBlock
+            - s3:PutBucketVersioning
+            - s3:PutBucketWebsite
+            - s3:PutEncryptionConfiguration
+            - s3:PutInventoryConfiguration
+            - s3:PutLifecycleConfiguration
+            - s3:PutMetricsConfiguration
+            - s3:PutReplicationConfiguration
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - s3:PutBucketPolicy
+            Effect: Allow
+            Resource: !Sub arn:${AWS::Partition}:s3:::bucket/${AppId}-*
+          - Action:
+            - sns:CreateTopic
+            - sns:DeleteTopic
+            - sns:GetTopicAttributes
+            - sns:ListSubscriptionsByTopic
+            - sns:ListTopics
+            - sns:SetSubscriptionAttributes
+            - sns:Subscribe
+            - sns:Unsubscribe
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - sqs:CreateQueue
+            - sqs:DeleteQueue
+            - sqs:GetQueueAttributes
+            - sqs:GetQueueUrl
+            - sqs:ListQueueTags
+            - sqs:TagQueue
+            - sqs:UntagQueue
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - iam:PassRole
+            Effect: Allow
+            Resource:
+            - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppId}-*'
+          - Action:
+            - cloudformation:CreateChangeSet
+            Effect: Allow
+            Resource:
+            - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31'
+          - Action:
+            - iam:CreateServiceLinkedRole
+            - iam:DeleteRole
+            - iam:GetRole
+            - iam:GetRolePolicy
+            - iam:PutRolePolicy
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - iam:AttachRolePolicy
+            - iam:CreateRole
+            - iam:DeleteRolePolicy
+            - iam:DetachRolePolicy
+            - iam:PutRolePermissionsBoundary
+            Condition:
+              StringEquals:
+                iam:PermissionsBoundary: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppId}-${AWS::Region}-PermissionsBoundary'
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - kms:CreateKey
+            - kms:CreateAlias
+            - kms:DeleteAlias
+            - kms:DisableKey
+            - kms:EnableKey
+            - kms:UpdateAlias
+            - kms:TagResource
+            - kms:UntagResource
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - cloudwatch:DeleteAlarms
+            - cloudwatch:DeleteDashboards
+            - cloudwatch:DisableAlarmActions
+            - cloudwatch:EnableAlarmActions
+            - cloudwatch:GetDashboard
+            - cloudwatch:ListTagsForResource
+            - cloudwatch:PutDashboard
+            - cloudwatch:PutMetricAlarm
+            - cloudwatch:PutMetricData
+            - cloudwatch:SetAlarmState
+            - cloudwatch:TagResource
+            - cloudwatch:UntagResource
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - logs:*
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - codedeploy:CreateApplication
+            - codedeploy:CreateDeployment
+            - codedeploy:CreateDeploymentConfig
+            - codedeploy:CreateDeploymentGroup
+            - codedeploy:DeleteApplication
+            - codedeploy:DeleteDeployment
+            - codedeploy:DeleteDeploymentConfig
+            - codedeploy:DeleteDeploymentGroup
+            - codedeploy:GetDeployment
+            - codedeploy:GetDeploymentConfig
+            - codedeploy:GetDeploymentGroup
+            - codedeploy:PutLifecycleEventHookExecutionStatus
+            - codedeploy:RegisterApplicationRevision
+            - codedeploy:StopDeployment
+            - codedeploy:UpdateApplication
+            - codedeploy:UpdateDeploymentGroup
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - firehose:CreateDeliveryStream
+            - firehose:DeleteDeliveryStream 
+            - firehose:DescribeDeliveryStream
+            - firehose:ListDeliveryStreams
+            - firehose:ListTagsForDeliveryStream
+            - firehose:PutRecord 
+            - firehose:PutRecordBatch 
+            - firehose:StartDeliveryStreamEncryption 
+            - firehose:StopDeliveryStreamEncryption 
+            - firehose:TagDeliveryStream 
+            - firehose:UntagDeliveryStream 
+            - firehose:UpdateDestination 
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - secretsmanager:CreateSecret
+            - secretsmanager:GetRandomPassword
+            - secretsmanager:GetResourcePolicy
+            - secretsmanager:ListSecrets
+            - secretsmanager:CancelRotateSecret
+            - secretsmanager:DeleteSecret
+            - secretsmanager:DescribeSecret
+            - secretsmanager:GetSecretValue
+            - secretsmanager:ListSecretVersionIds
+            - secretsmanager:PutSecretValue
+            - secretsmanager:RestoreSecret
+            - secretsmanager:RotateSecret
+            - secretsmanager:TagResource
+            - secretsmanager:UntagResource
+            - secretsmanager:UpdateSecret
+            - secretsmanager:UpdateSecretVersionStage
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - secretsmanager:DeleteResourcePolicy
+            - secretsmanager:PutResourcePolicy
+            Effect: Allow
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'aws:RequestTag/aws:cloudformation:stack-name':
+                  - !Ref 'AppId'
+              'ForAllValues:StringEquals': 
+                'aws:TagKeys': 'aws:cloudformation:stack-name'
+          - Action:
+            - glue:List*
+            - glue:CreateDatabase
+            - glue:DeleteDatabase
+            - glue:GetDatabase
+            - glue:GetDatabases
+            - glue:UpdateDatabase            
+            - glue:CreateTable
+            - glue:DeleteTable
+            - glue:DeleteTableVersions
+            - glue:GetTable
+            - glue:GetTables
+            - glue:GetTableVersion
+            - glue:GetTableVersions
+            - glue:UpdateTable
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - ssm:DescribeParameters
+            - ssm:AddTagsToResource
+            - ssm:DeleteParameter
+            - ssm:DeleteParameters
+            - ssm:DescribeDocumentParameters
+            - ssm:LabelParameterVersion
+            - ssm:GetParameter
+            - ssm:GetParameterHistory
+            - ssm:GetParameters
+            - ssm:GetParametersByPath
+            - ssm:PutParameter
+            - ssm:RemoveTagsFromResource
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - states:CreateActivity
+            - states:GetActivityTask
+            - states:DeleteActivity
+            - states:DescribeActivity
+            - states:ListActivities
+            - states:SendTaskHeartbeat
+            - states:SendTaskFailure
+            - states:SendTaskSuccess
+            - states:TagResource
+            - states:UntagResource
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - ec2:DescribeAccountAttributes
+            - ec2:DescribeSecurityGroups
+            - ec2:DescribeSubnets
+            - ec2:DescribeVpcs
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - rds:AddRoleToDBInstance
+            - rds:CreateDBInstance
+            - rds:CreateDBInstanceReadReplica
+            - rds:DeleteDBInstance
+            - rds:DownloadCompleteDBLogFile
+            - rds:DownloadDBLogFilePortion
+            - rds:Describe*
+            - rds:ListTagsForResource
+            - rds:ModifyDBInstance 
+            - rds:ModifyDBSnapshot 
+            - rds:ModifyDBSnapshotAttribute 
+            - rds:PromoteReadReplica
+            - rds:PurchaseReservedDBInstancesOffering
+            - rds:RebootDBInstance 
+            - rds:RemoveRoleFromDBInstance
+            - rds:RemoveTagsFromResource
+            - rds:RestoreDBInstanceFromDBSnapshot
+            - rds:RestoreDBInstanceFromS3
+            - rds:RestoreDBInstanceToPointInTime
+            - rds:StartDBInstance
+            - rds:StopDBInstance
+            Effect: Allow
+            Resource: '*'
+        PolicyName: WorkerCloudFormationRolePolicy
+      RoleName: !Sub '${AppId}-${AWS::Region}-CloudFormationRole'
+    Type: AWS::IAM::Role
+  CodeBuildProject:
+    DependsOn:
+    - ToolChainRole
+    Properties:
+      Artifacts:
+        Packaging: zip
+        Type: codepipeline
+      Description: !Join
+      - ''
+      - - 'AWS CloudFormation created CodeBuild App for '
+        - !Ref 'AppId'
+      Environment:
+        ComputeType: small
+        EnvironmentVariables:
+        - Name: S3_BUCKET
+          Value: !Ref 'S3Bucket'
+        - Name: APP_ID
+          Value: !Ref 'AppId'
+        - Name: ACCOUNT_ID
+          Value: !Ref 'AWS::AccountId'
+        - Name: PARTITION
+          Value: !Ref 'AWS::Partition'
+        Image: aws/lambda/nodejs:10-1.0
+        Type: LINUX_CONTAINER
+      Name: !Ref 'AppId'
+      ServiceRole: !Ref 'ToolChainRole'
+      Source:
+        Type: codepipeline
+    Type: AWS::CodeBuild::Project
+  CodeCommitRepo:
+    Condition: CreateRepoWithCodeCommit
+    Description: Creating AWS CodeCommit repository for application source code
+    Properties:
+      RepositoryDescription: !Join
+      - ''
+      - - !Ref 'AppId'
+        - 'app repository'
+      RepositoryName: !Ref 'RepositoryName'
+      Code:
+        S3:
+          Bucket: !Ref 'SourceCodeBucketName'
+          Key: !Ref 'SourceCodeBucketKey'
+    Type: AWS::CodeCommit::Repository
+  GitHubRepo:
+    Condition: CreateRepoWithGitHub
+    DeletionPolicy : Retain
+    Properties:
+      RepositoryName: !Ref 'RepositoryName'
+      RepositoryAccessToken: !Ref 'GitHubRepositoryAccessToken'
+      RepositoryOwner: !Ref 'GitHubRepositoryOwner'
+      EnableIssues: true
+      IsPrivate: true
+      Code:
+        S3:
+          Bucket: !Ref 'SourceCodeBucketName'
+          Key: !Ref 'SourceCodeBucketKey'
+    Type: AWS::CodeStar::GitHubRepository
+  PipelineWebHook:
+    Condition: CreateRepoWithGitHub
+    DependsOn:
+      - ProjectPipeline
+    Properties:
+      AuthenticationConfiguration:
+        SecretToken: !Ref 'GitHubWebHookSecretToken'
+      Filters:
+      - JsonPath: "$.ref"
+        MatchEquals: refs/heads/{Branch}
+      Authentication: GITHUB_HMAC
+      TargetPipeline: !Ref ProjectPipeline
+      TargetAction: ApplicationSource
+      Name: !Join
+      - '-'
+      - - !Ref 'AppId'
+        - WebHook
+      TargetPipelineVersion: !GetAtt ProjectPipeline.Version
+      RegisterWithThirdParty: true
+    Type: AWS::CodePipeline::Webhook
+  PermissionsBoundaryPolicy:
+    Description: Creating an IAM managed policy for defining the permissions boundary for an AWS Lambda App
+    Properties:
+      Description: IAM policy to define the permissions boundary for IAM entities created in an AWS Lambda App
+      ManagedPolicyName: !Sub '${AppId}-${AWS::Region}-PermissionsBoundary'
+      PolicyDocument:
+        Statement:
+        - Action:
+          - '*'
+          Effect: Allow
+          Resource: !Ref 'AppResourceArns'
+          Sid: StackResources
+        - Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:DescribeLogGroups
+          - logs:PutLogEvents
+          - xray:Put*
+          Effect: Allow
+          Resource: '*'
+          Sid: StaticPermissions
+        - Action: '*'
+          Effect: Allow
+          Resource: '*'
+          Condition:
+            StringEquals:
+              'aws:RequestTag/aws:cloudformation:stack-name':
+                - !Ref 'AppId'
+            'ForAllValues:StringEquals':
+              'aws:TagKeys': 'aws:cloudformation:stack-name'
+          Sid: StackResourcesTagging
+        Version: 2012-10-17
+    Type: AWS::IAM::ManagedPolicy
+  ProjectPipeline:
+    DependsOn:
+    - ToolChainRole
+    - S3Bucket
+    - CodeBuildProject
+    - CloudFormationRole
+    Description: Creating a deployment pipeline for your project in AWS CodePipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref 'S3Bucket'
+        Type: S3
+      Name: !Join
+      - '-'
+      - - !Ref 'AppId'
+        - Pipeline
+      RoleArn: !GetAtt
+      - ToolChainRole
+      - Arn
+      Stages:
+      - Actions:
+        - ActionTypeId:
+            Category: Source
+            Owner: !If [CreateRepoWithCodeCommit, AWS, ThirdParty]
+            Provider: !If [CreateRepoWithCodeCommit, CodeCommit, GitHub]
+            Version: 1
+          Configuration:
+            !If
+              - CreateRepoWithCodeCommit
+              -
+                BranchName: master
+                PollForSourceChanges: false
+                RepositoryName: !Ref 'RepositoryName'
+              -
+                Branch: master
+                OAuthToken: !Ref 'GitHubRepositoryAccessToken'
+                Owner: !Ref 'GitHubRepositoryOwner'
+                PollForSourceChanges: false
+                Repo: !Ref 'RepositoryName'
+          InputArtifacts: [
+            ]
+          Name: ApplicationSource
+          OutputArtifacts:
+          - Name: !Join
+            - '-'
+            - - !Ref 'AppId'
+              - SourceArtifact
+          RunOrder: 1
+        Name: Source
+      - Actions:
+        - ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: 1
+          Configuration:
+            ProjectName: !Ref 'AppId'
+          InputArtifacts:
+          - Name: !Join
+            - '-'
+            - - !Ref 'AppId'
+              - SourceArtifact
+          Name: PackageExport
+          OutputArtifacts:
+          - Name: !Join
+            - '-'
+            - - !Ref 'AppId'
+              - BuildArtifact
+          RunOrder: 1
+        Name: Build
+      - Actions:
+        - ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: 1
+          Configuration:
+            ActionMode: CHANGE_SET_REPLACE
+            Capabilities: CAPABILITY_NAMED_IAM
+            ChangeSetName: pipeline-changeset
+            ParameterOverrides: !Sub '{"AppId":"${AppId}"}'
+            RoleArn: !GetAtt
+            - CloudFormationRole
+            - Arn
+            StackName: !Ref 'AppId'
+            TemplatePath: !Sub '${AppId}-BuildArtifact::template-export.yml'
+          InputArtifacts:
+          - Name: !Join
+            - '-'
+            - - !Ref 'AppId'
+              - BuildArtifact
+          Name: GenerateChangeSet
+          OutputArtifacts: [
+            ]
+          RunOrder: 1
+        - ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: 1
+          Configuration:
+            ActionMode: CHANGE_SET_EXECUTE
+            ChangeSetName: pipeline-changeset
+            StackName: !Ref 'AppId'
+          InputArtifacts: [
+            ]
+          Name: ExecuteChangeSet
+          OutputArtifacts: [
+            ]
+          RunOrder: 2
+        Name: Deploy
+    Type: AWS::CodePipeline::Pipeline
+  S3ArtifactBucketPolicy:
+    Description: Setting Amazon S3 bucket policy for AWS CodePipeline access
+    Properties:
+      Bucket: !Ref 'S3Bucket'
+      PolicyDocument:
+        Id: SSEAndSSLPolicy
+        Statement:
+        - Action:
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - s3:GetBucketVersioning
+          Condition:
+            Bool:
+              aws:SecureTransport: false
+          Effect: Allow
+          Principal:
+            AWS:
+            - !GetAtt
+              - ToolChainRole
+              - Arn
+            - !GetAtt
+              - CloudFormationRole
+              - Arn
+          Resource:
+          - !Join
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref 'S3Bucket'
+          - !Join
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref 'S3Bucket'
+              - /*
+          Sid: WhitelistedGet
+        - Action:
+          - s3:PutObject
+          Effect: Allow
+          Principal:
+            AWS:
+            - !GetAtt
+              - ToolChainRole
+              - Arn
+          Resource:
+          - !Join
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref 'S3Bucket'
+          - !Join
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref 'S3Bucket'
+              - /*
+          Sid: WhitelistedPut
+        Version: 2012-10-17
+    Type: AWS::S3::BucketPolicy
+  S3Bucket:
+    DeletionPolicy: Delete
+    Description: Creating Amazon S3 bucket for AWS CodePipeline artifacts
+    Properties:
+      BucketName: !Join
+      - '-'
+      - - aws
+        - !Ref 'AWS::Region'
+        - !Ref 'AWS::AccountId'
+        - !Ref 'AppId'
+        - pipe
+      Tags:
+      - Key: Name
+        Value: !Join
+        - '-'
+        - - !Ref 'AppId'
+          - S3Bucket
+      VersioningConfiguration:
+        Status: Enabled
+    Type: AWS::S3::Bucket
+  SourceEvent:
+    Condition: CreateRepoWithCodeCommit
+    Properties:
+      Description: Rule for Amazon CloudWatch Events to detect changes to the source repository and trigger pipeline execution
+      EventPattern:
+        detail:
+          event:
+          - referenceCreated
+          - referenceUpdated
+          referenceName:
+          - master
+          referenceType:
+          - branch
+        detail-type:
+        - CodeCommit Repository State Change
+        resources:
+        - !GetAtt 'CodeCommitRepo.Arn'
+        source:
+        - aws.codecommit
+      Name: !Join
+      - '-'
+      - - !Ref 'AppId'
+        - SourceEvent
+      State: ENABLED
+      Targets:
+      - Arn: !Join
+        - ':'
+        - - arn
+          - !Ref 'AWS::Partition'
+          - codepipeline
+          - !Ref 'AWS::Region'
+          - !Ref 'AWS::AccountId'
+          - !Join
+            - '-'
+            - - !Ref 'AppId'
+              - Pipeline
+        Id: ProjectPipelineTarget
+        RoleArn: !GetAtt 'ToolChainRole.Arn'
+    Type: AWS::Events::Rule
+  ToolChainRole:
+    Description: Creating toolchain role in IAM for Amazon EC2 instances
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - codebuild.amazonaws.com
+            - codedeploy.amazonaws.com
+            - codepipeline.amazonaws.com
+            - elasticbeanstalk.amazonaws.com
+            - events.amazonaws.com
+            - lambda.amazonaws.com
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - '*'
+            Effect: Allow
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AppId}/*'
+              - !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/${AppId}'
+              - !Sub 'arn:${AWS::Partition}:codecommit:${AWS::Region}:${AWS::AccountId}:${RepositoryName}'
+              - !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${AppId}-Pipeline'
+              - !Sub 'arn:${AWS::Partition}:s3:::${S3Bucket}'
+              - !Sub 'arn:${AWS::Partition}:s3:::${S3Bucket}/*'
+          - Action:
+            - iam:PassRole
+            Effect: Allow
+            Resource:
+              - !GetAtt 'CloudFormationRole.Arn'
+          - Action:
+            - cloudtrail:CreateTrail
+            - cloudtrail:StartLogging
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:DescribeLogGroups
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - kms:GenerateDataKey*
+            - kms:Encrypt
+            - kms:Decrypt
+            Effect: Allow
+            Resource: '*'
+        PolicyName: ToolChainWorkerPolicy
+      RoleName: !Sub '${AppId}-${AWS::Region}-ToolChain'
+    Type: AWS::IAM::Role
