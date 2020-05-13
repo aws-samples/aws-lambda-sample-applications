@@ -78,6 +78,7 @@ Resources:
             - lambda:DeleteFunction
             - lambda:DeleteFunctionConcurrency
             - lambda:DeleteLayerVersion
+            - lambda:DeleteProvisionedConcurrencyConfig
             - lambda:GetEventSourceMapping
             - lambda:GetFunction
             - lambda:GetFunctionConfiguration
@@ -87,6 +88,7 @@ Resources:
             - lambda:PublishLayerVersion
             - lambda:PublishVersion
             - lambda:PutFunctionConcurrency
+            - lambda:PutProvisionedConcurrencyConfig
             - lambda:TagResource
             - lambda:UntagResource
             - lambda:UpdateAlias
@@ -96,7 +98,11 @@ Resources:
             Resource: '*'
           - Action:
             - lambda:AddPermission
+            - lambda:DeleteFunctionEventInvokeConfig
+            - lambda:InvokeFunction
+            - lambda:PutFunctionEventInvokeConfig
             - lambda:RemovePermission
+            - lambda:UpdateFunctionEventInvokeConfig
             Effect: Allow
             Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppId}-*'
           - Action:
@@ -288,17 +294,17 @@ Resources:
             Resource: '*'
           - Action:
             - firehose:CreateDeliveryStream
-            - firehose:DeleteDeliveryStream 
+            - firehose:DeleteDeliveryStream
             - firehose:DescribeDeliveryStream
             - firehose:ListDeliveryStreams
             - firehose:ListTagsForDeliveryStream
-            - firehose:PutRecord 
-            - firehose:PutRecordBatch 
-            - firehose:StartDeliveryStreamEncryption 
-            - firehose:StopDeliveryStreamEncryption 
-            - firehose:TagDeliveryStream 
-            - firehose:UntagDeliveryStream 
-            - firehose:UpdateDestination 
+            - firehose:PutRecord
+            - firehose:PutRecordBatch
+            - firehose:StartDeliveryStreamEncryption
+            - firehose:StopDeliveryStreamEncryption
+            - firehose:TagDeliveryStream
+            - firehose:UntagDeliveryStream
+            - firehose:UpdateDestination
             Effect: Allow
             Resource: '*'
           - Action:
@@ -329,7 +335,7 @@ Resources:
               StringEquals:
                 'aws:RequestTag/aws:cloudformation:stack-name':
                   - !Ref 'AppId'
-              'ForAllValues:StringEquals': 
+              'ForAllValues:StringEquals':
                 'aws:TagKeys': 'aws:cloudformation:stack-name'
           - Action:
             - glue:List*
@@ -337,7 +343,7 @@ Resources:
             - glue:DeleteDatabase
             - glue:GetDatabase
             - glue:GetDatabases
-            - glue:UpdateDatabase            
+            - glue:UpdateDatabase
             - glue:CreateTable
             - glue:DeleteTable
             - glue:DeleteTableVersions
@@ -392,12 +398,12 @@ Resources:
             - rds:DownloadDBLogFilePortion
             - rds:Describe*
             - rds:ListTagsForResource
-            - rds:ModifyDBInstance 
-            - rds:ModifyDBSnapshot 
-            - rds:ModifyDBSnapshotAttribute 
+            - rds:ModifyDBInstance
+            - rds:ModifyDBSnapshot
+            - rds:ModifyDBSnapshotAttribute
             - rds:PromoteReadReplica
             - rds:PurchaseReservedDBInstancesOffering
-            - rds:RebootDBInstance 
+            - rds:RebootDBInstance
             - rds:RemoveRoleFromDBInstance
             - rds:RemoveTagsFromResource
             - rds:RestoreDBInstanceFromDBSnapshot
@@ -746,7 +752,7 @@ Resources:
         RoleArn: !GetAtt 'ToolChainRole.Arn'
     Type: AWS::Events::Rule
   ToolChainRole:
-    Description: Creating toolchain role in IAM for Amazon EC2 instances
+    Description: Creating toolchain role in IAM for CodePipeline
     Properties:
       AssumeRolePolicyDocument:
         Statement:
@@ -797,3 +803,4 @@ Resources:
         PolicyName: ToolChainWorkerPolicy
       RoleName: !Sub '${AppId}-${AWS::Region}-ToolChain'
     Type: AWS::IAM::Role
+
