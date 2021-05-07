@@ -37,7 +37,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/get-all-items.getAllItemsHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       MemorySize: 128
       Timeout: 60
       Description: A simple example includes a HTTP get method to get all items from a DynamoDB table.
@@ -64,7 +64,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/get-by-id.getByIdHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       MemorySize: 128
       Timeout: 60
       Description: A simple example includes a HTTP get method to get one item by id from a DynamoDB table.
@@ -91,7 +91,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/put-item.putItemHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       MemorySize: 128
       Timeout: 60
       Description: A simple example includes a HTTP post method to add one item to a DynamoDB table.

@@ -78,7 +78,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/hello-from-lambda.helloFromLambdaHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       MemorySize: 128
       Timeout: 60
       DeadLetterQueue:

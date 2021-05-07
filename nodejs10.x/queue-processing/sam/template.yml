@@ -37,7 +37,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/sqs-payload-logger.sqsPayloadLoggerHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       Description: A Lambda function that logs the payload of messages sent to an associated SQS queue.
       MemorySize: 128
       Timeout: 25 # Chosen to be less than the default SQS Visibility Timeout of 30 seconds

@@ -37,7 +37,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/s3-json-logger.s3JsonLoggerHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       Description: A Lambda function that logs a json file sent to S3 bucket.
       MemorySize: 128
       Timeout: 60

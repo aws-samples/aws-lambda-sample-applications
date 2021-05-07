@@ -85,7 +85,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/sns-payload-logger.snsPayloadLoggerHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       Description: A Lambda function that logs the payload of messages sent to an associated SNS topic.
       MemorySize: 128
       Timeout: 60
