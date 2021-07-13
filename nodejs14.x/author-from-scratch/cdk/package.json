@@ -1,0 +1,14 @@
+{
+    "name": "lambda-from-scratch",
+    "description": "Start from scratch starter project",
+    "version": "0.0.1",
+    "private": true,
+    "dependencies": {
+    },
+    "devDependencies": {
+        "jest": "^25.4.0"
+    },
+    "scripts": {
+        "test": "jest"
+    }
+}
