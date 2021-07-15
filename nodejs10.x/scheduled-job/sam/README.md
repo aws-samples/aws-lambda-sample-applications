@@ -82,7 +82,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/handlers/scheduled-event-logger.scheduledEventLoggerHandler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       Description: A Lambda function that logs the payload of scheduled events.
       MemorySize: 128
       Timeout: 60
