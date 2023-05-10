@@ -18,19 +18,9 @@ Parameters:
     MaxLength: 100
     MinLength: 1
     Type: String
-  GitHubRepositoryAccessToken:
-    Description: GitHub Repository access token
-    Type: String
-    NoEcho: true
-    Default: ""
   GitHubRepositoryOwner:
     Description: GitHub Repository owner
     Type: String
-    Default: ""
-  GitHubWebHookSecretToken:
-    Description: GitHub Webhook secret token
-    Type: String
-    NoEcho: true
     Default: ""
   SourceCodeBucketKey:
     Description: Source Code repository S3 bucket key
@@ -41,13 +31,22 @@ Parameters:
   UseCodeCommit:
     Description: Create code repository with CodeCommit
     Type: String
+  ConnectionArn:
+    Description: CodeStar Connections ARN
+    Type: String
+    Default: ""
 Conditions:
+  ConnectionArnEmpty: !Equals
+  - !Ref 'ConnectionArn'
+  - ""
   CreateRepoWithCodeCommit: !Equals
   - !Ref 'UseCodeCommit'
   - true
   CreateRepoWithGitHub: !Equals
   - !Ref 'UseCodeCommit'
   - false
+  CreateRepoWithCodeStarConnections: !Not
+  - Condition: ConnectionArnEmpty
 
 Resources:
   CloudFormationRole:
@@ -414,7 +413,7 @@ Resources:
             Effect: Allow
             Resource: '*'
         PolicyName: WorkerCloudFormationRolePolicy
-      RoleName: !Sub '${AppId}-${AWS::Region}-CloudFormationRole'
+      RoleName: !Sub 'CloudFormationRole-${AppId}-${AWS::Region}'
     Type: AWS::IAM::Role
   CodeBuildProject:
     DependsOn:
@@ -438,7 +437,7 @@ Resources:
           Value: !Ref 'AWS::AccountId'
         - Name: PARTITION
           Value: !Ref 'AWS::Partition'
-        Image: aws/lambda/nodejs:10-1.0
+        Image: public.ecr.aws/sam/build-nodejs18.x
         Type: LINUX_CONTAINER
       Name: !Ref 'AppId'
       ServiceRole: !Ref 'ToolChainRole'
@@ -455,16 +454,19 @@ Resources:
         - 'app repository'
       RepositoryName: !Ref 'RepositoryName'
       Code:
+        BranchName: main
         S3:
           Bucket: !Ref 'SourceCodeBucketName'
           Key: !Ref 'SourceCodeBucketKey'
     Type: AWS::CodeCommit::Repository
   GitHubRepo:
     Condition: CreateRepoWithGitHub
+    Description: Creating GitHub repository for application source code
     DeletionPolicy : Retain
     Properties:
+      ConnectionArn: !If [CreateRepoWithCodeStarConnections, !Ref 'ConnectionArn', !Ref AWS::NoValue]
       RepositoryName: !Ref 'RepositoryName'
-      RepositoryAccessToken: !Ref 'GitHubRepositoryAccessToken'
+      RepositoryDescription: !Sub "Repository for Lambda application ${AppId}"
       RepositoryOwner: !Ref 'GitHubRepositoryOwner'
       EnableIssues: true
       IsPrivate: true
@@ -473,26 +475,6 @@ Resources:
           Bucket: !Ref 'SourceCodeBucketName'
           Key: !Ref 'SourceCodeBucketKey'
     Type: AWS::CodeStar::GitHubRepository
-  PipelineWebHook:
-    Condition: CreateRepoWithGitHub
-    DependsOn:
-      - ProjectPipeline
-    Properties:
-      AuthenticationConfiguration:
-        SecretToken: !Ref 'GitHubWebHookSecretToken'
-      Filters:
-      - JsonPath: "$.ref"
-        MatchEquals: refs/heads/{Branch}
-      Authentication: GITHUB_HMAC
-      TargetPipeline: !Ref ProjectPipeline
-      TargetAction: ApplicationSource
-      Name: !Join
-      - '-'
-      - - !Ref 'AppId'
-        - WebHook
-      TargetPipelineVersion: !GetAtt ProjectPipeline.Version
-      RegisterWithThirdParty: true
-    Type: AWS::CodePipeline::Webhook
   PermissionsBoundaryPolicy:
     Description: Creating an IAM managed policy for defining the permissions boundary for an AWS Lambda App
     Properties:
@@ -548,22 +530,33 @@ Resources:
       - Actions:
         - ActionTypeId:
             Category: Source
-            Owner: !If [CreateRepoWithCodeCommit, AWS, ThirdParty]
-            Provider: !If [CreateRepoWithCodeCommit, CodeCommit, GitHub]
+            Owner: 
+              !If
+                - CreateRepoWithCodeStarConnections
+                -
+                  AWS
+                -
+                  !If [CreateRepoWithCodeCommit, AWS, ThirdParty]
+            Provider: 
+              !If
+                - CreateRepoWithCodeStarConnections
+                -
+                  CodeStarSourceConnection
+                -
+                  !If [CreateRepoWithCodeCommit, CodeCommit, GitHub]
             Version: 1
           Configuration:
             !If
-              - CreateRepoWithCodeCommit
+              - CreateRepoWithCodeStarConnections
               -
                 BranchName: master
+                ConnectionArn: !Ref 'ConnectionArn'
+                FullRepositoryId: !Join [/, [!Ref 'GitHubRepositoryOwner', !Ref 'RepositoryName']]
+                OutputArtifactFormat: CODE_ZIP
+              -
+                BranchName: main
                 PollForSourceChanges: false
                 RepositoryName: !Ref 'RepositoryName'
-              -
-                Branch: master
-                OAuthToken: !Ref 'GitHubRepositoryAccessToken'
-                Owner: !Ref 'GitHubRepositoryOwner'
-                PollForSourceChanges: false
-                Repo: !Ref 'RepositoryName'
           InputArtifacts: [
             ]
           Name: ApplicationSource
@@ -722,7 +715,7 @@ Resources:
           - referenceCreated
           - referenceUpdated
           referenceName:
-          - master
+          - main
           referenceType:
           - branch
         detail-type:
@@ -765,7 +758,6 @@ Resources:
             - codepipeline.amazonaws.com
             - elasticbeanstalk.amazonaws.com
             - events.amazonaws.com
-            - lambda.amazonaws.com
       Path: /
       Policies:
       - PolicyDocument:
@@ -794,13 +786,13 @@ Resources:
             - logs:PutLogEvents
             Effect: Allow
             Resource: '*'
-          - Action:
-            - kms:GenerateDataKey*
-            - kms:Encrypt
-            - kms:Decrypt
-            Effect: Allow
-            Resource: '*'
+          - !If
+            - CreateRepoWithCodeStarConnections
+            - Action:
+              - codestar-connections:UseConnection
+              Effect: Allow
+              Resource: !Ref 'ConnectionArn'
+            - !Ref AWS::NoValue
         PolicyName: ToolChainWorkerPolicy
-      RoleName: !Sub '${AppId}-${AWS::Region}-ToolChain'
+      RoleName: !Sub 'ToolChain-${AppId}-${AWS::Region}'
     Type: AWS::IAM::Role
-
