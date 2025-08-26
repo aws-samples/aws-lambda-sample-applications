@@ -26,7 +26,7 @@ export class CdkStack extends Stack {
         new lambda.Function(this, 'sqsPayloadLogger', {
             description: 'A Lambda function that logs the payload of messages sent to an associated SQS queue.',
             handler: 'src/handlers/sqs-payload-logger.sqsPayloadLoggerHandler',
-            runtime: lambda.Runtime.NODEJS_18_X,
+            runtime: lambda.Runtime.NODEJS_20_X,
             code: lambda.Code.fromBucket(
                 s3.Bucket.fromBucketName(this, 'ArtifactBucket', artifactBucket),
                 artifactKey,
