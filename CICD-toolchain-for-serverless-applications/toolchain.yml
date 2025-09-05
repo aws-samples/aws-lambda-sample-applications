@@ -229,6 +229,7 @@ Resources:
             - iam:GetRole
             - iam:GetRolePolicy
             - iam:PutRolePolicy
+            - iam:TagRole
             Effect: Allow
             Resource: '*'
           - Action:
@@ -437,7 +438,7 @@ Resources:
           Value: !Ref 'AWS::AccountId'
         - Name: PARTITION
           Value: !Ref 'AWS::Partition'
-        Image: public.ecr.aws/sam/build-nodejs18.x
+        Image: public.ecr.aws/sam/build-nodejs22.x
         Type: LINUX_CONTAINER
       Name: !Ref 'AppId'
       ServiceRole: !Ref 'ToolChainRole'
