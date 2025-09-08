@@ -1,0 +1,31 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      # Install all dependencies (including dependencies for running tests)
+      - npm install
+      # Install CDK dependencies
+      - cd cdk
+      - npm install
+      - cd ..
+  pre_build:
+    commands:
+      # Discover and run unit tests in the '__tests__' directory
+      - npm run test
+      # Remove all dependencies not needed for the Lambda deployment package (the packages from devDependencies in package.json)
+      - npm prune --production
+      # Copy artifacts to a separate folder
+      - mkdir function-code
+      - cp -r src node_modules function-code
+  build:
+    commands:
+      # Archive Lambda function code and upload it to S3
+      - cd function-code
+      - zip -r function-code.zip .
+      - aws s3 cp function-code.zip s3://$S3_BUCKET/$CODEBUILD_BUILD_ID/
+      # Use AWS CDK to synthesize the application
+      - cd ../cdk
+      - ./node_modules/.bin/cdk synth > ../template-export.yml
+artifacts:
+  files:
+    - template-export.yml

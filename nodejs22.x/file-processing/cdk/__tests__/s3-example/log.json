@@ -1,0 +1,11 @@
+[{
+    "namespace": "session",
+    "createTime": "2019-01-01T12:00:00.000Z",
+    "data": [{
+        "name": "end",
+        "value": 50,
+        "unit": "Milliseconds",
+        "metadata": {}
+    }]
+}]
+
