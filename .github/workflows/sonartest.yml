@@ -1,0 +1,24 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
+
+      - name: Run SonarQube analysis
+        run: mvn sonar:sonar
+        env:
+          SONAR_HOST_URL: https://your-sonarqube-server
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
