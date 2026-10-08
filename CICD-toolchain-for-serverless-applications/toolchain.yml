@@ -225,18 +225,18 @@ Resources:
             - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31'
           - Action:
             - iam:CreateServiceLinkedRole
-            - iam:DeleteRole
             - iam:GetRole
             - iam:GetRolePolicy
-            - iam:PutRolePolicy
             - iam:TagRole
             Effect: Allow
             Resource: '*'
           - Action:
             - iam:AttachRolePolicy
             - iam:CreateRole
+            - iam:DeleteRole
             - iam:DeleteRolePolicy
             - iam:DetachRolePolicy
+            - iam:PutRolePolicy
             - iam:PutRolePermissionsBoundary
             Condition:
               StringEquals:
@@ -308,13 +308,16 @@ Resources:
             Effect: Allow
             Resource: '*'
           - Action:
-            - secretsmanager:CreateSecret
             - secretsmanager:GetRandomPassword
             - secretsmanager:GetResourcePolicy
             - secretsmanager:ListSecrets
+            - secretsmanager:DescribeSecret
+            Effect: Allow
+            Resource: '*'
+          - Action:
+            - secretsmanager:CreateSecret
             - secretsmanager:CancelRotateSecret
             - secretsmanager:DeleteSecret
-            - secretsmanager:DescribeSecret
             - secretsmanager:GetSecretValue
             - secretsmanager:ListSecretVersionIds
             - secretsmanager:PutSecretValue
@@ -325,7 +328,7 @@ Resources:
             - secretsmanager:UpdateSecret
             - secretsmanager:UpdateSecretVersionStage
             Effect: Allow
-            Resource: '*'
+            Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AppId}-*'
           - Action:
             - secretsmanager:DeleteResourcePolicy
             - secretsmanager:PutResourcePolicy
@@ -356,19 +359,22 @@ Resources:
             Resource: '*'
           - Action:
             - ssm:DescribeParameters
+            - ssm:GetParameter
+            - ssm:GetParameterHistory
+            - ssm:GetParameters
+            - ssm:GetParametersByPath
+            Effect: Allow
+            Resource: '*'
+          - Action:
             - ssm:AddTagsToResource
             - ssm:DeleteParameter
             - ssm:DeleteParameters
             - ssm:DescribeDocumentParameters
             - ssm:LabelParameterVersion
-            - ssm:GetParameter
-            - ssm:GetParameterHistory
-            - ssm:GetParameters
-            - ssm:GetParametersByPath
             - ssm:PutParameter
             - ssm:RemoveTagsFromResource
             Effect: Allow
-            Resource: '*'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AppId}/*'
           - Action:
             - states:CreateActivity
             - states:GetActivityTask
